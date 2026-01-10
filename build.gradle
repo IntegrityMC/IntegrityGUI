@@ -1,0 +1,21 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '9.3.1'
+}
+
+group = 'com.github.integritymc'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    maven {url = 'https://hub.spigotmc.org/nexus/content/groups/public/' }
+}
+
+dependencies {
+    compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
