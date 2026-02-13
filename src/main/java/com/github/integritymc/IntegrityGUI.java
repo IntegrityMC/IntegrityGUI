@@ -42,8 +42,9 @@ public class IntegrityGUI implements Listener {
     private Navigation navigation;
     private BukkitTask closeTask;
     private boolean closed;
+    private final boolean sound;
 
-    public IntegrityGUI(Plugin plugin, Player player, String title, int rows) {
+    public IntegrityGUI(Plugin plugin, Player player, String title, int rows, boolean sound) {
         if (plugin == null) throw new IllegalArgumentException("Plugin cannot be null");
         if (player == null) throw new IllegalArgumentException("Player cannot be null");
         if (title == null) throw new IllegalArgumentException("Title cannot be null");
@@ -60,6 +61,7 @@ public class IntegrityGUI implements Listener {
         this.currentPage = 0;
         this.registered = false;
         this.closed = false;
+        this.sound = sound;
     }
 
     public IntegrityGUI setItem(int slot, ItemStack item) {
@@ -149,7 +151,7 @@ public class IntegrityGUI implements Listener {
         permanentActions.put(prevSlot, clickType -> {
             if (currentPage > 0) {
                 currentPage--;
-                playSound(VersionChecker.isNewerOrEqualVersion(ServerVersion.V_1_16_0) ? Sound.ITEM_BOOK_PAGE_TURN : Sound.ENTITY_EXPERIENCE_ORB_PICKUP);
+                if (sound) playSound(VersionChecker.isNewerOrEqualVersion(ServerVersion.V_1_16_0) ? Sound.ITEM_BOOK_PAGE_TURN : Sound.ENTITY_EXPERIENCE_ORB_PICKUP);
                 render();
             }
         });
@@ -157,7 +159,7 @@ public class IntegrityGUI implements Listener {
         permanentActions.put(nextSlot, clickType -> {
             if (currentPage < pages.size() - 1) {
                 currentPage++;
-                playSound(VersionChecker.isNewerOrEqualVersion(ServerVersion.V_1_16_0) ? Sound.ITEM_BOOK_PAGE_TURN : Sound.ENTITY_EXPERIENCE_ORB_PICKUP);
+                if (sound) playSound(VersionChecker.isNewerOrEqualVersion(ServerVersion.V_1_16_0) ? Sound.ITEM_BOOK_PAGE_TURN : Sound.ENTITY_EXPERIENCE_ORB_PICKUP);
                 render();
             }
         });
@@ -192,7 +194,7 @@ public class IntegrityGUI implements Listener {
 
         this.inventory = buildInventory();
         activeGuis.put(player.getUniqueId(), this);
-        playSound(Sound.BLOCK_NOTE_BLOCK_PLING);
+        if (sound) playSound(Sound.BLOCK_NOTE_BLOCK_PLING);
 
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (player.isOnline() && !closed) {
@@ -342,7 +344,7 @@ public class IntegrityGUI implements Listener {
         int slot = e.getSlot();
         if (slot < 0 || slot >= size) return;
 
-        playSound(Sound.UI_BUTTON_CLICK);
+        if (sound) playSound(Sound.UI_BUTTON_CLICK);
 
         if (permanentActions.containsKey(slot)) {
             Consumer<ClickType> action = permanentActions.get(slot);
