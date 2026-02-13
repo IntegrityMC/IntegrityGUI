@@ -9,6 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -20,6 +21,7 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 public class IntegrityGUI implements Listener {
 
@@ -33,7 +35,7 @@ public class IntegrityGUI implements Listener {
 
     private Inventory inventory;
     private final Map<Integer, ItemStack> permanentItems;
-    private final Map<Integer, Runnable> permanentActions;
+    private final Map<Integer, Consumer<ClickType>> permanentActions;
     private final List<Page> pages;
     private int currentPage;
     private boolean registered;
@@ -70,7 +72,7 @@ public class IntegrityGUI implements Listener {
         return this;
     }
 
-    public IntegrityGUI setItem(int slot, ItemStack item, Runnable action) {
+    public IntegrityGUI setItem(int slot, ItemStack item, Consumer<ClickType> action) {
         validateSlot(slot);
         if (item != null) {
             permanentItems.put(slot, item.clone());
@@ -125,7 +127,7 @@ public class IntegrityGUI implements Listener {
         return this;
     }
 
-    public IntegrityGUI setPageItem(int page, int slot, ItemStack item, Runnable action) {
+    public IntegrityGUI setPageItem(int page, int slot, ItemStack item, Consumer<ClickType> action) {
         ensurePage(page);
         validateSlot(slot);
         pages.get(page).setItem(slot, item, action);
@@ -144,7 +146,7 @@ public class IntegrityGUI implements Listener {
                 nextItem != null ? nextItem.clone() : null
         );
 
-        permanentActions.put(prevSlot, () -> {
+        permanentActions.put(prevSlot, clickType -> {
             if (currentPage > 0) {
                 currentPage--;
                 playSound(VersionChecker.isNewerOrEqualVersion(ServerVersion.V_1_16_0) ? Sound.ITEM_BOOK_PAGE_TURN : Sound.ENTITY_EXPERIENCE_ORB_PICKUP);
@@ -152,7 +154,7 @@ public class IntegrityGUI implements Listener {
             }
         });
 
-        permanentActions.put(nextSlot, () -> {
+        permanentActions.put(nextSlot, clickType -> {
             if (currentPage < pages.size() - 1) {
                 currentPage++;
                 playSound(VersionChecker.isNewerOrEqualVersion(ServerVersion.V_1_16_0) ? Sound.ITEM_BOOK_PAGE_TURN : Sound.ENTITY_EXPERIENCE_ORB_PICKUP);
@@ -164,7 +166,7 @@ public class IntegrityGUI implements Listener {
     }
 
     public IntegrityGUI setBackButton(int slot, ItemStack item, Runnable action) {
-        return setItem(slot, item, () -> {
+        return setItem(slot, item, clickType -> {
             close();
             if (action != null) {
                 Bukkit.getScheduler().runTask(plugin, action);
@@ -343,10 +345,10 @@ public class IntegrityGUI implements Listener {
         playSound(Sound.UI_BUTTON_CLICK);
 
         if (permanentActions.containsKey(slot)) {
-            Runnable action = permanentActions.get(slot);
+            Consumer<ClickType> action = permanentActions.get(slot);
             if (action != null) {
                 try {
-                    action.run();
+                    action.accept(e.getClick());
                 } catch (Exception ex) {
                     plugin.getLogger().warning("Error executing GUI action: " + ex.getMessage());
                 }
@@ -355,10 +357,10 @@ public class IntegrityGUI implements Listener {
         }
 
         if (currentPage < pages.size()) {
-            Runnable action = pages.get(currentPage).getAction(slot);
+            Consumer<ClickType> action = pages.get(currentPage).getAction(slot);
             if (action != null) {
                 try {
-                    action.run();
+                    action.accept(e.getClick());
                 } catch (Exception ex) {
                     plugin.getLogger().warning("Error executing page action: " + ex.getMessage());
                 }
@@ -437,7 +439,7 @@ public class IntegrityGUI implements Listener {
 
     private static class Page {
         private final Map<Integer, ItemStack> items = new HashMap<>();
-        private final Map<Integer, Runnable> actions = new HashMap<>();
+        private final Map<Integer, Consumer<ClickType>> actions = new HashMap<>();
 
         public void setItem(int slot, ItemStack item) {
             if (item != null) {
@@ -447,7 +449,7 @@ public class IntegrityGUI implements Listener {
             }
         }
 
-        public void setItem(int slot, ItemStack item, Runnable action) {
+        public void setItem(int slot, ItemStack item, Consumer<ClickType> action) {
             if (item != null) {
                 items.put(slot, item.clone());
                 if (action != null) {
@@ -465,7 +467,7 @@ public class IntegrityGUI implements Listener {
             return items;
         }
 
-        public Runnable getAction(int slot) {
+        public Consumer<ClickType> getAction(int slot) {
             return actions.get(slot);
         }
     }
