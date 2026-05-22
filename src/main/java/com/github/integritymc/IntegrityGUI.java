@@ -1,21 +1,21 @@
 package com.github.integritymc;
 
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
-import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -23,45 +23,110 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-public class IntegrityGUI implements Listener {
+public class IntegrityGUI {
 
     private static final Map<UUID, IntegrityGUI> activeGuis = new ConcurrentHashMap<>();
+    private static final Set<Plugin> listenerPlugins = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+    private static final LegacyComponentSerializer LEGACY_SERIALIZER = LegacyComponentSerializer.builder()
+            .character('\u00a7')
+            .hexColors()
+            .useUnusualXRepeatedCharacterHexFormat()
+            .build();
 
     private final Plugin plugin;
     private final Player player;
     private final String title;
+    private final InventoryType inventoryType;
     private final int size;
     private final int rows;
 
     private Inventory inventory;
     private final Map<Integer, ItemStack> permanentItems;
-    private final Map<Integer, Consumer<ClickType>> permanentActions;
+    private final Map<Integer, Consumer<InventoryClickEvent>> permanentActions;
     private final List<Page> pages;
     private int currentPage;
-    private boolean registered;
     private Navigation navigation;
     private BukkitTask closeTask;
     private boolean closed;
-    private final boolean sound;
 
-    public IntegrityGUI(Plugin plugin, Player player, String title, int rows, boolean sound) {
+    public IntegrityGUI(Plugin plugin, Player player, String title, int rows) {
+        this(plugin, player, title, InventoryType.CHEST, validateRows(rows) * 9, rows);
+    }
+
+    public IntegrityGUI(Plugin plugin, Player player, String title, InventoryType inventoryType) {
+        this(
+                plugin,
+                player,
+                title,
+                validateInventoryType(inventoryType),
+                inventoryType.getDefaultSize(),
+                Math.max(1, inventoryType.getDefaultSize() / 9)
+        );
+    }
+
+    private IntegrityGUI(Plugin plugin, Player player, String title, InventoryType inventoryType, int size, int rows) {
         if (plugin == null) throw new IllegalArgumentException("Plugin cannot be null");
         if (player == null) throw new IllegalArgumentException("Player cannot be null");
         if (title == null) throw new IllegalArgumentException("Title cannot be null");
-        if (rows < 1 || rows > 6) throw new IllegalArgumentException("Rows must be between 1 and 6");
 
         this.plugin = plugin;
         this.player = player;
-        this.title = ChatColor.translateAlternateColorCodes('&', title);
+        this.title = parseMiniMessage(title);
+        this.inventoryType = inventoryType;
         this.rows = rows;
-        this.size = rows * 9;
+        this.size = size;
         this.permanentItems = new HashMap<>();
         this.permanentActions = new HashMap<>();
         this.pages = new ArrayList<>();
         this.currentPage = 0;
-        this.registered = false;
         this.closed = false;
-        this.sound = sound;
+    }
+
+    private static int validateRows(int rows) {
+        if (rows < 1 || rows > 6) throw new IllegalArgumentException("Rows must be between 1 and 6");
+        return rows;
+    }
+
+    private static InventoryType validateInventoryType(InventoryType inventoryType) {
+        if (inventoryType == null) throw new IllegalArgumentException("Inventory type cannot be null");
+        return inventoryType;
+    }
+
+    public static String parseMiniMessage(String text) {
+        if (text == null) throw new IllegalArgumentException("Text cannot be null");
+        return LEGACY_SERIALIZER.serialize(MINI_MESSAGE.deserialize(text));
+    }
+
+    public static ItemStack withName(ItemStack item, String displayName) {
+        if (item == null) throw new IllegalArgumentException("Item cannot be null");
+        if (displayName == null) throw new IllegalArgumentException("Display name cannot be null");
+
+        ItemStack copy = item.clone();
+        ItemMeta meta = copy.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(parseMiniMessage(displayName));
+            copy.setItemMeta(meta);
+        }
+        return copy;
+    }
+
+    public static ItemStack withLore(ItemStack item, List<String> lore) {
+        if (item == null) throw new IllegalArgumentException("Item cannot be null");
+        if (lore == null) throw new IllegalArgumentException("Lore cannot be null");
+
+        List<String> parsedLore = new ArrayList<>(lore.size());
+        for (String line : lore) {
+            parsedLore.add(parseMiniMessage(line));
+        }
+
+        ItemStack copy = item.clone();
+        ItemMeta meta = copy.getItemMeta();
+        if (meta != null) {
+            meta.setLore(parsedLore);
+            copy.setItemMeta(meta);
+        }
+        return copy;
     }
 
     public IntegrityGUI setItem(int slot, ItemStack item) {
@@ -74,7 +139,7 @@ public class IntegrityGUI implements Listener {
         return this;
     }
 
-    public IntegrityGUI setItem(int slot, ItemStack item, Consumer<ClickType> action) {
+    public IntegrityGUI setItem(int slot, ItemStack item, Consumer<InventoryClickEvent> action) {
         validateSlot(slot);
         if (item != null) {
             permanentItems.put(slot, item.clone());
@@ -129,7 +194,7 @@ public class IntegrityGUI implements Listener {
         return this;
     }
 
-    public IntegrityGUI setPageItem(int page, int slot, ItemStack item, Consumer<ClickType> action) {
+    public IntegrityGUI setPageItem(int page, int slot, ItemStack item, Consumer<InventoryClickEvent> action) {
         ensurePage(page);
         validateSlot(slot);
         pages.get(page).setItem(slot, item, action);
@@ -148,18 +213,16 @@ public class IntegrityGUI implements Listener {
                 nextItem != null ? nextItem.clone() : null
         );
 
-        permanentActions.put(prevSlot, clickType -> {
+        permanentActions.put(prevSlot, event -> {
             if (currentPage > 0) {
                 currentPage--;
-                if (sound) playSound(VersionChecker.isNewerOrEqualVersion(ServerVersion.V_1_16_0) ? Sound.ITEM_BOOK_PAGE_TURN : Sound.ENTITY_EXPERIENCE_ORB_PICKUP);
                 render();
             }
         });
 
-        permanentActions.put(nextSlot, clickType -> {
+        permanentActions.put(nextSlot, event -> {
             if (currentPage < pages.size() - 1) {
                 currentPage++;
-                if (sound) playSound(VersionChecker.isNewerOrEqualVersion(ServerVersion.V_1_16_0) ? Sound.ITEM_BOOK_PAGE_TURN : Sound.ENTITY_EXPERIENCE_ORB_PICKUP);
                 render();
             }
         });
@@ -168,7 +231,7 @@ public class IntegrityGUI implements Listener {
     }
 
     public IntegrityGUI setBackButton(int slot, ItemStack item, Runnable action) {
-        return setItem(slot, item, clickType -> {
+        return setItem(slot, item, event -> {
             close();
             if (action != null) {
                 Bukkit.getScheduler().runTask(plugin, action);
@@ -187,14 +250,10 @@ public class IntegrityGUI implements Listener {
 
         if (pages.isEmpty()) addPage();
 
-        if (!registered) {
-            plugin.getServer().getPluginManager().registerEvents(this, plugin);
-            registered = true;
-        }
+        registerListener(plugin);
 
         this.inventory = buildInventory();
         activeGuis.put(player.getUniqueId(), this);
-        if (sound) playSound(Sound.BLOCK_NOTE_BLOCK_PLING);
 
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (player.isOnline() && !closed) {
@@ -230,7 +289,9 @@ public class IntegrityGUI implements Listener {
     }
 
     private Inventory buildInventory() {
-        Inventory inv = Bukkit.createInventory(null, size, title);
+        Inventory inv = inventoryType == InventoryType.CHEST
+                ? Bukkit.createInventory(null, size, title)
+                : Bukkit.createInventory(null, inventoryType, title);
         populateInventory(inv);
         return inv;
     }
@@ -306,7 +367,6 @@ public class IntegrityGUI implements Listener {
             closeTask = null;
         }
 
-        unregister();
         inventory = null;
     }
 
@@ -319,15 +379,13 @@ public class IntegrityGUI implements Listener {
         cleanup();
     }
 
-    private void unregister() {
-        if (registered) {
-            HandlerList.unregisterAll(this);
-            registered = false;
+    private static void registerListener(Plugin plugin) {
+        if (listenerPlugins.add(plugin)) {
+            plugin.getServer().getPluginManager().registerEvents(new GuiListener(), plugin);
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onClick(InventoryClickEvent e) {
+    private void handleClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player)) return;
         if (!e.getWhoClicked().equals(player)) return;
         if (inventory == null || closed) return;
@@ -344,13 +402,11 @@ public class IntegrityGUI implements Listener {
         int slot = e.getSlot();
         if (slot < 0 || slot >= size) return;
 
-        if (sound) playSound(Sound.UI_BUTTON_CLICK);
-
         if (permanentActions.containsKey(slot)) {
-            Consumer<ClickType> action = permanentActions.get(slot);
+            Consumer<InventoryClickEvent> action = permanentActions.get(slot);
             if (action != null) {
                 try {
-                    action.accept(e.getClick());
+                    action.accept(e);
                 } catch (Exception ex) {
                     plugin.getLogger().warning("Error executing GUI action: " + ex.getMessage());
                 }
@@ -359,10 +415,10 @@ public class IntegrityGUI implements Listener {
         }
 
         if (currentPage < pages.size()) {
-            Consumer<ClickType> action = pages.get(currentPage).getAction(slot);
+            Consumer<InventoryClickEvent> action = pages.get(currentPage).getAction(slot);
             if (action != null) {
                 try {
-                    action.accept(e.getClick());
+                    action.accept(e);
                 } catch (Exception ex) {
                     plugin.getLogger().warning("Error executing page action: " + ex.getMessage());
                 }
@@ -370,8 +426,7 @@ public class IntegrityGUI implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onDrag(InventoryDragEvent e) {
+    private void handleDrag(InventoryDragEvent e) {
         if (!(e.getWhoClicked() instanceof Player)) return;
         if (!e.getWhoClicked().equals(player)) return;
         if (inventory == null || closed) return;
@@ -380,8 +435,7 @@ public class IntegrityGUI implements Listener {
         e.setCancelled(true);
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onClose(InventoryCloseEvent e) {
+    private void handleClose(InventoryCloseEvent e) {
         if (!e.getPlayer().equals(player)) return;
         if (inventory == null) return;
         if (!e.getInventory().equals(inventory)) return;
@@ -389,17 +443,9 @@ public class IntegrityGUI implements Listener {
         closeTask = Bukkit.getScheduler().runTaskLater(plugin, this::cleanup, 1L);
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onQuit(PlayerQuitEvent e) {
+    private void handleQuit(PlayerQuitEvent e) {
         if (!e.getPlayer().equals(player)) return;
         cleanup();
-    }
-
-    private void playSound(Sound sound) {
-        if (!player.isOnline()) return;
-        try {
-            player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
-        } catch (Exception ignored) {}
     }
 
     public Inventory getInventory() {
@@ -414,6 +460,14 @@ public class IntegrityGUI implements Listener {
         return Math.max(1, pages.size());
     }
 
+    public InventoryType getInventoryType() {
+        return inventoryType;
+    }
+
+    public int getSize() {
+        return size;
+    }
+
     public Player getPlayer() {
         return player;
     }
@@ -423,6 +477,7 @@ public class IntegrityGUI implements Listener {
     }
 
     public static IntegrityGUI getActiveGui(Player player) {
+        if (player == null) return null;
         return activeGuis.get(player.getUniqueId());
     }
 
@@ -441,7 +496,7 @@ public class IntegrityGUI implements Listener {
 
     private static class Page {
         private final Map<Integer, ItemStack> items = new HashMap<>();
-        private final Map<Integer, Consumer<ClickType>> actions = new HashMap<>();
+        private final Map<Integer, Consumer<InventoryClickEvent>> actions = new HashMap<>();
 
         public void setItem(int slot, ItemStack item) {
             if (item != null) {
@@ -451,7 +506,7 @@ public class IntegrityGUI implements Listener {
             }
         }
 
-        public void setItem(int slot, ItemStack item, Consumer<ClickType> action) {
+        public void setItem(int slot, ItemStack item, Consumer<InventoryClickEvent> action) {
             if (item != null) {
                 items.put(slot, item.clone());
                 if (action != null) {
@@ -469,7 +524,7 @@ public class IntegrityGUI implements Listener {
             return items;
         }
 
-        public Consumer<ClickType> getAction(int slot) {
+        public Consumer<InventoryClickEvent> getAction(int slot) {
             return actions.get(slot);
         }
     }
@@ -485,6 +540,41 @@ public class IntegrityGUI implements Listener {
             this.prevItem = prevItem;
             this.nextSlot = nextSlot;
             this.nextItem = nextItem;
+        }
+    }
+
+    private static class GuiListener implements Listener {
+
+        @EventHandler(priority = EventPriority.HIGHEST)
+        public void onClick(InventoryClickEvent e) {
+            IntegrityGUI gui = activeGuis.get(e.getWhoClicked().getUniqueId());
+            if (gui != null) {
+                gui.handleClick(e);
+            }
+        }
+
+        @EventHandler(priority = EventPriority.HIGHEST)
+        public void onDrag(InventoryDragEvent e) {
+            IntegrityGUI gui = activeGuis.get(e.getWhoClicked().getUniqueId());
+            if (gui != null) {
+                gui.handleDrag(e);
+            }
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void onClose(InventoryCloseEvent e) {
+            IntegrityGUI gui = activeGuis.get(e.getPlayer().getUniqueId());
+            if (gui != null) {
+                gui.handleClose(e);
+            }
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void onQuit(PlayerQuitEvent e) {
+            IntegrityGUI gui = activeGuis.get(e.getPlayer().getUniqueId());
+            if (gui != null) {
+                gui.handleQuit(e);
+            }
         }
     }
 }
