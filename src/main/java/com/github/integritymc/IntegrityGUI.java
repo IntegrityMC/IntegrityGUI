@@ -29,7 +29,7 @@ public class IntegrityGUI {
     private static final Set<Plugin> listenerPlugins = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
     private static final LegacyComponentSerializer LEGACY_SERIALIZER = LegacyComponentSerializer.builder()
-            .character('\u00a7')
+            .character('§')
             .hexColors()
             .useUnusualXRepeatedCharacterHexFormat()
             .build();
