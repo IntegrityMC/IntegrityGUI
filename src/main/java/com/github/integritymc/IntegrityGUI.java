@@ -415,7 +415,7 @@ public class IntegrityGUI {
         if (!(e.getWhoClicked() instanceof Player)) return;
         if (!e.getWhoClicked().equals(player)) return;
         if (inventory == null || closed) return;
-        if (!isViewingInventory(e.getView().getTopInventory())) return;
+        if (!isViewingInventory(getTopInventory(e))) return;
 
         e.setCancelled(true);
         syncInventory();
@@ -454,7 +454,7 @@ public class IntegrityGUI {
         if (!(e.getWhoClicked() instanceof Player)) return;
         if (!e.getWhoClicked().equals(player)) return;
         if (inventory == null || closed) return;
-        if (!isViewingInventory(e.getView().getTopInventory())) return;
+        if (!isViewingInventory(getTopInventory(e))) return;
 
         e.setCancelled(true);
         syncInventory();
@@ -470,6 +470,18 @@ public class IntegrityGUI {
 
     private boolean isViewingInventory(Inventory topInventory) {
         return topInventory != null && topInventory.equals(inventory);
+    }
+
+    private Inventory getTopInventory(Object event) {
+        try {
+            Object view = event.getClass().getMethod("getView").invoke(event);
+            Object topInventory = view.getClass().getMethod("getTopInventory").invoke(view);
+            if (topInventory instanceof Inventory) {
+                return (Inventory) topInventory;
+            }
+        } catch (Exception ignored) {}
+
+        return null;
     }
 
     private void syncInventory() {
