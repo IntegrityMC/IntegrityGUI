@@ -8,7 +8,7 @@ IntegrityGUI is a small Spigot GUI API for building per-player inventories with 
 ## Requirements
 
 - Java 8+
-- Spigot API 1.16.5+
+- Spigot/Paper 1.8+
 - GUI titles, display names and lore helpers use MiniMessage syntax.
 
 ## Features
@@ -21,6 +21,7 @@ IntegrityGUI is a small Spigot GUI API for building per-player inventories with 
 - Single shared listener for click, drag, close and quit events.
 - Per-player active GUI tracking.
 - No built-in audio feedback.
+- Compiled against Spigot API 1.8.8 for broad runtime compatibility.
 
 ## Usage
 
@@ -30,7 +31,7 @@ Direct GUI creation is still supported:
 IntegrityGUI gui = new IntegrityGUI(plugin, player, "<gold>Shop</gold>", 6);
 
 ItemStack border = IntegrityGUI.withName(
-        new ItemStack(Material.BLACK_STAINED_GLASS_PANE),
+        new ItemStack(Material.STONE),
         "<dark_gray>-"
 );
 

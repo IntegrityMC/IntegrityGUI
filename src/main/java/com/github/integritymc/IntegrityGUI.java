@@ -29,7 +29,7 @@ public class IntegrityGUI {
     private static final Set<Plugin> listenerPlugins = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
     private static final LegacyComponentSerializer LEGACY_SERIALIZER = LegacyComponentSerializer.builder()
-            .character('§')
+            .character('\u00a7')
             .hexColors()
             .useUnusualXRepeatedCharacterHexFormat()
             .build();
@@ -60,8 +60,8 @@ public class IntegrityGUI {
                 player,
                 title,
                 validateInventoryType(inventoryType),
-                inventoryType.getDefaultSize(),
-                Math.max(1, inventoryType.getDefaultSize() / 9)
+                getDefaultSize(inventoryType),
+                Math.max(1, getDefaultSize(inventoryType) / 9)
         );
     }
 
@@ -91,6 +91,34 @@ public class IntegrityGUI {
     private static InventoryType validateInventoryType(InventoryType inventoryType) {
         if (inventoryType == null) throw new IllegalArgumentException("Inventory type cannot be null");
         return inventoryType;
+    }
+
+    private static int getDefaultSize(InventoryType inventoryType) {
+        try {
+            Object size = InventoryType.class.getMethod("getDefaultSize").invoke(inventoryType);
+            if (size instanceof Integer) {
+                return (Integer) size;
+            }
+        } catch (Exception ignored) {}
+
+        String name = inventoryType.name();
+        if ("CHEST".equals(name)) return 27;
+        if ("DISPENSER".equals(name) || "DROPPER".equals(name)) return 9;
+        if ("FURNACE".equals(name) || "ANVIL".equals(name) || "BREWING".equals(name)) return 3;
+        if ("WORKBENCH".equals(name) || "CRAFTING".equals(name)) return 10;
+        if ("ENCHANTING".equals(name)) return 2;
+        if ("PLAYER".equals(name) || "CREATIVE".equals(name)) return 41;
+        if ("MERCHANT".equals(name)) return 3;
+        if ("ENDER_CHEST".equals(name)) return 27;
+        if ("BEACON".equals(name)) return 1;
+        if ("HOPPER".equals(name)) return 5;
+        if ("SHULKER_BOX".equals(name)) return 27;
+        if ("BARREL".equals(name)) return 27;
+        if ("BLAST_FURNACE".equals(name) || "SMOKER".equals(name)) return 3;
+        if ("CARTOGRAPHY".equals(name) || "GRINDSTONE".equals(name) || "SMITHING".equals(name) || "STONECUTTER".equals(name)) return 3;
+        if ("LOOM".equals(name)) return 4;
+
+        return 9;
     }
 
     public static String parseMiniMessage(String text) {
@@ -267,7 +295,7 @@ public class IntegrityGUI {
 
         if (player.isOnline()) {
             Bukkit.getScheduler().runTask(plugin, () -> {
-                if (inventory != null && player.getOpenInventory().getTopInventory().equals(inventory)) {
+                if (inventory != null) {
                     player.closeInventory();
                 }
             });
@@ -283,9 +311,7 @@ public class IntegrityGUI {
             return;
         }
 
-        if (player.getOpenInventory().getTopInventory().equals(inventory)) {
-            render();
-        }
+        render();
     }
 
     private Inventory buildInventory() {
@@ -362,8 +388,10 @@ public class IntegrityGUI {
         closed = true;
         activeGuis.remove(player.getUniqueId());
 
-        if (closeTask != null && !closeTask.isCancelled()) {
-            closeTask.cancel();
+        if (closeTask != null) {
+            try {
+                closeTask.cancel();
+            } catch (Exception ignored) {}
             closeTask = null;
         }
 
@@ -372,9 +400,7 @@ public class IntegrityGUI {
 
     private void forceClose() {
         if (player.isOnline() && inventory != null) {
-            if (player.getOpenInventory().getTopInventory().equals(inventory)) {
-                player.closeInventory();
-            }
+            player.closeInventory();
         }
         cleanup();
     }
@@ -389,12 +415,11 @@ public class IntegrityGUI {
         if (!(e.getWhoClicked() instanceof Player)) return;
         if (!e.getWhoClicked().equals(player)) return;
         if (inventory == null || closed) return;
-        if (!e.getView().getTopInventory().equals(inventory)) return;
+        if (!e.getInventory().equals(inventory)) return;
 
         e.setCancelled(true);
 
-        if (e.getClickedInventory() == null) return;
-        if (!e.getClickedInventory().equals(inventory)) return;
+        if (e.getRawSlot() < 0 || e.getRawSlot() >= size) return;
 
         ItemStack current = e.getCurrentItem();
         if (current == null || current.getType() == Material.AIR) return;
@@ -430,7 +455,7 @@ public class IntegrityGUI {
         if (!(e.getWhoClicked() instanceof Player)) return;
         if (!e.getWhoClicked().equals(player)) return;
         if (inventory == null || closed) return;
-        if (!e.getView().getTopInventory().equals(inventory)) return;
+        if (!e.getInventory().equals(inventory)) return;
 
         e.setCancelled(true);
     }
