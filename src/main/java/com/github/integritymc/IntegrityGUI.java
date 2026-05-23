@@ -29,7 +29,7 @@ public class IntegrityGUI {
     private static final Set<Plugin> listenerPlugins = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
     private static final LegacyComponentSerializer LEGACY_SERIALIZER = LegacyComponentSerializer.builder()
-            .character('\u00a7')
+            .character('§')
             .hexColors()
             .useUnusualXRepeatedCharacterHexFormat()
             .build();
@@ -415,17 +415,16 @@ public class IntegrityGUI {
         if (!(e.getWhoClicked() instanceof Player)) return;
         if (!e.getWhoClicked().equals(player)) return;
         if (inventory == null || closed) return;
-        if (!e.getInventory().equals(inventory)) return;
+        if (!isViewingInventory(e.getView().getTopInventory())) return;
 
         e.setCancelled(true);
+        syncInventory();
 
         if (e.getRawSlot() < 0 || e.getRawSlot() >= size) return;
 
-        ItemStack current = e.getCurrentItem();
+        int slot = e.getRawSlot();
+        ItemStack current = inventory.getItem(slot);
         if (current == null || current.getType() == Material.AIR) return;
-
-        int slot = e.getSlot();
-        if (slot < 0 || slot >= size) return;
 
         if (permanentActions.containsKey(slot)) {
             Consumer<InventoryClickEvent> action = permanentActions.get(slot);
@@ -455,17 +454,32 @@ public class IntegrityGUI {
         if (!(e.getWhoClicked() instanceof Player)) return;
         if (!e.getWhoClicked().equals(player)) return;
         if (inventory == null || closed) return;
-        if (!e.getInventory().equals(inventory)) return;
+        if (!isViewingInventory(e.getView().getTopInventory())) return;
 
         e.setCancelled(true);
+        syncInventory();
     }
 
     private void handleClose(InventoryCloseEvent e) {
         if (!e.getPlayer().equals(player)) return;
         if (inventory == null) return;
-        if (!e.getInventory().equals(inventory)) return;
+        if (!isViewingInventory(e.getInventory())) return;
 
         closeTask = Bukkit.getScheduler().runTaskLater(plugin, this::cleanup, 1L);
+    }
+
+    private boolean isViewingInventory(Inventory topInventory) {
+        return topInventory != null && topInventory.equals(inventory);
+    }
+
+    private void syncInventory() {
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!closed && player.isOnline()) {
+                try {
+                    player.updateInventory();
+                } catch (Exception ignored) {}
+            }
+        });
     }
 
     private void handleQuit(PlayerQuitEvent e) {
