@@ -9,6 +9,7 @@ IntegrityGUI is a small Spigot GUI API for building per-player inventories with 
 
 - Java 8+
 - Spigot/Paper 1.8+
+- PacketEvents 2.x installed on the server or provided by the plugin using this library.
 - GUI titles, display names and lore helpers use MiniMessage syntax.
 
 ## Features
@@ -18,7 +19,8 @@ IntegrityGUI is a small Spigot GUI API for building per-player inventories with 
 - Built-in multi-page navigation with customizable previous/next buttons.
 - Back button helper that closes the GUI and runs a callback.
 - Border and row fill helpers for simple layouts.
-- Single shared listener for click, drag, close and quit events.
+- PacketEvents-based click handling to cancel inventory movement before Bukkit processes it.
+- Single shared listener for close and quit cleanup.
 - Per-player active GUI tracking.
 - No built-in audio feedback.
 - Compiled against Spigot API 1.8.8 for broad runtime compatibility.

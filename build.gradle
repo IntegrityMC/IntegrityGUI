@@ -9,10 +9,13 @@ version = '1.0-SNAPSHOT'
 repositories {
     mavenCentral()
     maven {url = 'https://hub.spigotmc.org/nexus/content/groups/public/' }
+    maven { url = 'https://repo.codemc.io/repository/maven-releases/' }
+    maven { url = 'https://repo.codemc.io/repository/maven-snapshots/' }
 }
 
 dependencies {
     compileOnly 'org.spigotmc:spigot-api:1.8.8-R0.1-SNAPSHOT'
+    compileOnly 'com.github.retrooper:packetevents-spigot:2.12.1'
     implementation 'net.kyori:adventure-text-minimessage:4.17.0'
     implementation 'net.kyori:adventure-text-serializer-legacy:4.17.0'
 }
