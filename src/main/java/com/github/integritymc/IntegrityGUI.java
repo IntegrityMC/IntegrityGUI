@@ -485,6 +485,7 @@ public class IntegrityGUI {
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!closed && player.isOnline()) {
                 try {
+                    player.setItemOnCursor(new ItemStack(Material.AIR));
                     player.updateInventory();
                 } catch (Exception ignored) {}
             }
