@@ -6,6 +6,7 @@ import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketReceiveEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientClickWindow;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
@@ -57,10 +58,18 @@ public class IntegrityGUI {
     private boolean closed;
 
     public IntegrityGUI(Plugin plugin, Player player, String title, int rows) {
+        this(plugin, player, miniMessage(title), InventoryType.CHEST, validateRows(rows) * 9, rows);
+    }
+
+    public IntegrityGUI(Plugin plugin, Player player, Component title, int rows) {
         this(plugin, player, title, InventoryType.CHEST, validateRows(rows) * 9, rows);
     }
 
     public IntegrityGUI(Plugin plugin, Player player, String title, InventoryType inventoryType) {
+        this(plugin, player, miniMessage(title), inventoryType);
+    }
+
+    public IntegrityGUI(Plugin plugin, Player player, Component title, InventoryType inventoryType) {
         this(
                 plugin,
                 player,
@@ -71,14 +80,14 @@ public class IntegrityGUI {
         );
     }
 
-    private IntegrityGUI(Plugin plugin, Player player, String title, InventoryType inventoryType, int size, int rows) {
+    private IntegrityGUI(Plugin plugin, Player player, Component title, InventoryType inventoryType, int size, int rows) {
         if (plugin == null) throw new IllegalArgumentException("Plugin cannot be null");
         if (player == null) throw new IllegalArgumentException("Player cannot be null");
         if (title == null) throw new IllegalArgumentException("Title cannot be null");
 
         this.plugin = plugin;
         this.player = player;
-        this.title = parseMiniMessage(title);
+        this.title = serializeComponent(title);
         this.inventoryType = inventoryType;
         this.rows = rows;
         this.size = size;
@@ -129,17 +138,31 @@ public class IntegrityGUI {
 
     public static String parseMiniMessage(String text) {
         if (text == null) throw new IllegalArgumentException("Text cannot be null");
-        return LEGACY_SERIALIZER.serialize(MINI_MESSAGE.deserialize(text));
+        return serializeComponent(miniMessage(text));
+    }
+
+    public static Component miniMessage(String text) {
+        if (text == null) throw new IllegalArgumentException("Text cannot be null");
+        return MINI_MESSAGE.deserialize(text);
+    }
+
+    public static String serializeComponent(Component component) {
+        if (component == null) throw new IllegalArgumentException("Component cannot be null");
+        return LEGACY_SERIALIZER.serialize(component);
     }
 
     public static ItemStack withName(ItemStack item, String displayName) {
+        return withName(item, miniMessage(displayName));
+    }
+
+    public static ItemStack withName(ItemStack item, Component displayName) {
         if (item == null) throw new IllegalArgumentException("Item cannot be null");
         if (displayName == null) throw new IllegalArgumentException("Display name cannot be null");
 
         ItemStack copy = item.clone();
         ItemMeta meta = copy.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName(parseMiniMessage(displayName));
+            meta.setDisplayName(serializeComponent(displayName));
             copy.setItemMeta(meta);
         }
         return copy;
@@ -161,6 +184,29 @@ public class IntegrityGUI {
             copy.setItemMeta(meta);
         }
         return copy;
+    }
+
+    public static ItemStack withLore(ItemStack item, Collection<Component> lore) {
+        if (item == null) throw new IllegalArgumentException("Item cannot be null");
+        if (lore == null) throw new IllegalArgumentException("Lore cannot be null");
+
+        List<String> serializedLore = new ArrayList<>(lore.size());
+        for (Component line : lore) {
+            serializedLore.add(serializeComponent(line));
+        }
+
+        ItemStack copy = item.clone();
+        ItemMeta meta = copy.getItemMeta();
+        if (meta != null) {
+            meta.setLore(serializedLore);
+            copy.setItemMeta(meta);
+        }
+        return copy;
+    }
+
+    public static ItemStack withLore(ItemStack item, Component... lore) {
+        if (lore == null) throw new IllegalArgumentException("Lore cannot be null");
+        return withLore(item, Arrays.asList(lore));
     }
 
     public IntegrityGUI setItem(int slot, ItemStack item) {

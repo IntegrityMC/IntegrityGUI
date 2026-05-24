@@ -1,5 +1,6 @@
 package com.github.integritymc;
 
+import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.plugin.Plugin;
@@ -17,7 +18,17 @@ public abstract class IntegrityMenu {
         this.player = player;
     }
 
-    protected abstract String title();
+    protected String title() {
+        return null;
+    }
+
+    protected Component titleComponent() {
+        String title = title();
+        if (title == null) {
+            throw new IllegalStateException("Menus must override title() or titleComponent()");
+        }
+        return IntegrityGUI.miniMessage(title);
+    }
 
     protected abstract void body(IntegrityGUI gui);
 
@@ -31,8 +42,8 @@ public abstract class IntegrityMenu {
 
     public IntegrityGUI create() {
         IntegrityGUI gui = inventoryType() == InventoryType.CHEST
-                ? new IntegrityGUI(plugin, player, title(), rows())
-                : new IntegrityGUI(plugin, player, title(), inventoryType());
+                ? new IntegrityGUI(plugin, player, titleComponent(), rows())
+                : new IntegrityGUI(plugin, player, titleComponent(), inventoryType());
 
         body(gui);
         return gui;
